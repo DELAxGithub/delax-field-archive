@@ -1,0 +1,97 @@
+# ============================================================
+# Episode Template - DELAX Field Archive
+# 新規EP作成時はこれをコピーして episodes/{ID}/episode.yaml に置く
+# ============================================================
+
+id: DWT_EP001                    # DWT | DBT + EP番号3桁ゼロ埋め
+series: DWT                      # DWT | DBT
+status: draft                    # draft | editing | published | archived
+
+# --- 自動取得セクション（scripts/extract_metadata.py で埋める） ---
+
+capture:
+  shot_date: "2026-03-07"        # YYYY-MM-DD
+  shot_start: "10:10:28"         # HH:MM:SS（現地時間 / filename由来、カメラ時計のTZズレ補正後）
+  shot_end: "10:36:26"
+  duration_sec: 1558
+  camera: "Insta360 X5"
+  resolution: "5760x2880"        # equirectangular 360°
+  fps: 30
+  raw_size_gb: 10.16
+
+geo:
+  capture_mode: "single-area"    # 一点突破収録
+  gpx_file: ""                   # GPXなし
+  start_coord: [36.7213, -4.4213]  # Málaga Catedral 付近の概算
+  end_coord: [36.7213, -4.4213]
+  distance_km: 0.0               # 未計測（GPXなし）
+  elevation_gain_m: 0            # 未計測
+  location_name: "Centro Histórico, Málaga"
+  city: "Málaga"
+  country: "Spain"
+  landmarks:                     # 一点突破収録のため単一エリアとして記録
+    - name: "Centro Histórico"
+      coord: [36.7213, -4.4213]
+      timestamp_sec: 0
+
+weather:
+  condition: "cloudy"            # WMO code 3 (overcast) / 本人記憶とも一致
+  temp_c: 12                     # 10:00 実測 11.7°C
+  wind_kmh: 6                    # 10:00 実測 6.2 km/h
+  humidity: 82                   # 10:00 実測 82%
+  source: open-meteo
+
+# --- 人間入力セクション（Claudeと対話で埋める） ---
+
+creative:
+  episode_title: "曇天のマラガ旧市街を歩く"
+  title_en: "Walking Málaga's Old Town on a Cloudy Morning"
+  theme: "オフシーズンの旧市街"
+  mood: "contemplative"
+  music_policy: "ambient-only"
+  chapters:                      # 3分割（編集後に要微調整）
+    - label: "Opening"
+      timestamp_sec: 0
+    - label: "Walking through Centro Histórico"
+      timestamp_sec: 60
+    - label: "Closing"
+      timestamp_sec: 1320
+  highlight_moments:             # 編集時に timestamp_sec / description を確定
+    - description: "TBD（編集時に選定）"
+      timestamp_sec: 0
+      duration_sec: 60
+      suggested_platform: "shorts"
+    - description: "TBD（編集時に選定）"
+      timestamp_sec: 0
+      duration_sec: 90
+      suggested_platform: "reels"
+    - description: "TBD（編集時に選定）"
+      timestamp_sec: 0
+      duration_sec: 140
+      suggested_platform: "twitter"
+  notes: "次回は時間帯を変える（曇天×朝10時はトーンが平板、ゴールデンアワーや夕方を検討）"
+
+# --- 公開管理セクション（公開時に追記） ---
+
+publish:
+  youtube_url: ""
+  published_at: ""               # YYYY-MM-DD
+  thumbnail_file: ""             # thumbnails/{ID}_main.png
+  playlist: ""                   # "Málaga & Beyond Walking" 等
+  derivatives:
+    - platform: shorts
+      url: ""
+      published_at: ""
+    - platform: reels
+      url: ""
+      published_at: ""
+    - platform: twitter
+      url: ""
+      published_at: ""
+
+# --- 資産化メタ ---
+
+archive:
+  created_at: "2026-04-22"       # YAML作成日時
+  updated_at: "2026-04-22"
+  git_commit: ""                 # 初commit hash（手動入力不要、参考用）

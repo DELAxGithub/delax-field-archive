@@ -1,0 +1,41 @@
+# Video / audio raw material (must never be committed per CLAUDE.md)
+*.mp4
+*.mov
+*.insv
+*.insp
+*.lrv
+*.thm
+*.wav
+*.aif
+*.aiff
+*.flac
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# Build / dependency artifacts
+DerivedData/
+dist/
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+credentials.*
+*.pem
+*.key
+
+# Large report artifacts (live in ~/Dropbox/delax-reports/ per CLAUDE.md)
+*.pptx
+*.pdf

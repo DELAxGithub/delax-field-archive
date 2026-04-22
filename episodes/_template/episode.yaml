@@ -1,0 +1,97 @@
+# ============================================================
+# Episode Template - DELAX Field Archive
+# 新規EP作成時はこれをコピーして episodes/{ID}/episode.yaml に置く
+# ============================================================
+
+id: DWT_EP000                    # DWT | DBT + EP番号3桁ゼロ埋め
+series: DWT                      # DWT | DBT
+status: draft                    # draft | editing | published | archived
+
+# --- 自動取得セクション（scripts/extract_metadata.py で埋める） ---
+
+capture:
+  shot_date: ""                  # YYYY-MM-DD
+  shot_start: ""                 # HH:MM:SS（現地時間）
+  shot_end: ""
+  duration_sec: 0
+  camera: ""                     # "Insta360 X5" | "Sony ZV-E10 II"
+  resolution: ""                 # "7680x3840" 等
+  fps: 0
+  raw_size_gb: 0.0
+
+geo:
+  capture_mode: "route"          # route（GPX走破型） | single-area（一点突破）
+  gpx_file: ""                   # gpx/{ID}.gpx（相対パス）※route時のみ
+  start_coord: [0.0, 0.0]        # [lat, lng]
+  end_coord: [0.0, 0.0]          # single-area時は start_coord と同じ
+  distance_km: 0.0               # ※route時のみ意味あり
+  elevation_gain_m: 0            # ※route時のみ意味あり
+  location_name: ""              # "Pedregalejo → Centro Histórico, Málaga"
+  city: ""
+  country: ""
+  landmarks:                     # route: GPX + Nominatim逆引き / single-area: エリア単一エントリ
+    - name: ""
+      coord: [0.0, 0.0]
+      timestamp_sec: 0           # 動画開始からの秒数（single-area時は0固定）
+
+weather:
+  condition: ""                  # clear | cloudy | rain | etc
+  temp_c: 0
+  wind_kmh: 0
+  humidity: 0
+  source: open-meteo
+
+# --- 人間入力セクション（Claudeと対話で埋める） ---
+
+creative:
+  episode_title: ""              # 例：「朝のペドレガレホから旧市街へ」
+  title_en: ""                   # 英語サブタイトル（SEO用）
+  theme: ""                      # 例：「朝市の活気」「夕暮れの散歩」
+  mood: ""                       # ambient | energetic | contemplative | etc
+  music_policy: ""               # ambient-only | light-bgm | full-bgm
+  chapters:                      # YouTubeチャプター（最低3本推奨：Opening / 本編 / Closing）
+    - label: "Opening"
+      timestamp_sec: 0
+    - label: ""                  # 本編開始（例: 60）
+      timestamp_sec: 0
+    - label: "Closing"
+      timestamp_sec: 0           # 例: duration - 60
+  highlight_moments:             # 派生クリップ候補（編集時に description/timestamp_sec 確定）
+    - description: "TBD"
+      timestamp_sec: 0
+      duration_sec: 60
+      suggested_platform: "shorts"
+    - description: "TBD"
+      timestamp_sec: 0
+      duration_sec: 90
+      suggested_platform: "reels"
+    - description: "TBD"
+      timestamp_sec: 0
+      duration_sec: 140
+      suggested_platform: "twitter"
+  notes: ""                      # 撮影時の気づき・次回改善点
+
+# --- 公開管理セクション（公開時に追記） ---
+
+publish:
+  youtube_url: ""
+  published_at: ""               # YYYY-MM-DD
+  thumbnail_file: ""             # thumbnails/{ID}_main.png
+  playlist: ""                   # "Málaga & Beyond Walking" 等
+  derivatives:
+    - platform: shorts
+      url: ""
+      published_at: ""
+    - platform: reels
+      url: ""
+      published_at: ""
+    - platform: twitter
+      url: ""
+      published_at: ""
+
+# --- 資産化メタ ---
+
+archive:
+  created_at: ""                 # YAML作成日時
+  updated_at: ""
+  git_commit: ""                 # 初commit hash（手動入力不要、参考用）
