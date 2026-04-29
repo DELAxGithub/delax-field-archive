@@ -1,0 +1,77 @@
+id: TEST_marseille2_2026-04-02
+series: DWT
+status: draft
+capture:
+  shot_date: '2026-04-02'
+  shot_start: ''
+  shot_end: ''
+  duration_sec: 958.2
+  camera: Insta360 X5
+  resolution: 3840x2160
+  fps: 30
+  raw_size_gb: 64.8
+geo:
+  capture_mode: route
+  gpx_file: ''
+  start_coord:
+  - 0.0
+  - 0.0
+  end_coord:
+  - 0.0
+  - 0.0
+  distance_km: 0.0
+  elevation_gain_m: 0
+  location_name: Vieux-Port → Le Panier, Marseille
+  city: Marseille
+  country: France
+  landmarks:
+  - name: Vieux-Port (旧港)
+    coord:
+    - 0.0
+    - 0.0
+    timestamp_sec: 0
+  - name: Le Panier (旧市街)
+    coord:
+    - 0.0
+    - 0.0
+    timestamp_sec: 0
+weather:
+  condition: clear
+  temp_c: 19
+  wind_kmh: 0
+  humidity: 0
+  source: manual
+creative:
+  episode_title: 春のマルセイユ
+  title_en: 'Marseille Walking Tour: Vieux-Port in Spring / 4K'
+  theme: 春の港町を散策する穏やかな時間
+  mood: ambient
+  music_policy: full-bgm
+  chapters:
+  - label: Opening / Vieux-Port
+    timestamp_sec: 0
+  - label: 旧港散策 (Vieux-Port walk)
+    timestamp_sec: 120
+  - label: Quai des Belges
+    timestamp_sec: 240
+  - label: 旧市街へ (Toward Le Panier)
+    timestamp_sec: 360
+  - label: Le Panier 路地散策
+    timestamp_sec: 480
+  - label: 石畳の街角
+    timestamp_sec: 600
+  - label: 夕方の港へ戻る
+    timestamp_sec: 720
+  - label: Closing
+    timestamp_sec: 840
+  highlight_moments: []
+  notes: 1stテストアップロード。Insta360 X5 ウォーターマーク無し書き出しで成功した素材 (v0.4 レンダ)。
+publish:
+  youtube_url: https://youtu.be/AGeuA2bx6xw
+  published_at: ''
+  thumbnail_file: ''
+  playlist: ''
+  youtube_video_id: AGeuA2bx6xw
+  shorts:
+    youtube: https://youtu.be/isHdcKddMfk
+    youtube_video_id: isHdcKddMfk
