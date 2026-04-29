@@ -212,26 +212,42 @@ def select_bgm_tracks(library: Path, total_duration_s: float,
         sys.exit(f"BGM catalog not found: {catalog_path} — run scripts/analyze_bgm.py first")
 
     catalog = json.loads(catalog_path.read_text())
+    # crossfade より短い曲を許すと accum の増分が負になり無限ループに陥る。
+    # crossfade × 1.5 を最小尺として弾く。
+    MIN_TRACK_DURATION_S = BGM_CROSSFADE_S * 1.5
     candidates = [
         c for c in catalog
         if c["genre"] in genres
         and c.get("intro_silence_ms", 0) < BGM_INTRO_SILENCE_MAX_MS
+        and c.get("duration_sec", 0) >= MIN_TRACK_DURATION_S
     ]
     if not candidates:
-        sys.exit(f"no BGM candidates for genres={genres} (after intro_silence filter)")
+        sys.exit(
+            f"no BGM candidates for genres={genres} "
+            f"(after intro_silence + min_duration={MIN_TRACK_DURATION_S}s filters)"
+        )
 
     rng = random.Random(seed)
     rng.shuffle(candidates)
 
     selected: list[dict] = []
     accum = 0.0
-    i = 0
-    while accum + BGM_CROSSFADE_S < total_duration_s:
+    # ループ上限: フィルタを通った時点で平均尺は MIN_TRACK_DURATION_S 以上なので
+    # 最悪ケースでも total_duration_s / MIN_TRACK_DURATION_S 反復で尺を満たすが、
+    # 念のため余裕を持って 10000 を上限とする。これを超えたら catalog/filter のバグ。
+    MAX_ITER = 10000
+    for i in range(MAX_ITER):
+        if accum + BGM_CROSSFADE_S >= total_duration_s:
+            break
         track = candidates[i % len(candidates)]
         selected.append(track)
         # 各曲は次の曲と BGM_CROSSFADE_S だけ重なる → 実効寄与 = duration - crossfade
         accum += track["duration_sec"] - BGM_CROSSFADE_S
-        i += 1
+    else:
+        sys.exit(
+            f"BGM selection exceeded {MAX_ITER} iterations without filling "
+            f"video_duration_s={total_duration_s}. catalog/filter の不整合の可能性。"
+        )
 
     return selected
 

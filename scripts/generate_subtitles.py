@@ -36,15 +36,21 @@ def srt_timestamp(sec: float) -> str:
 
 
 def segments_to_srt(segments: list[dict]) -> str:
-    """mlx-whisper segments → SRT 文字列。"""
+    """mlx-whisper segments → SRT 文字列。
+
+    SRT 仕様上 cue 番号は 1..N で連続している必要があるので、
+    空テキスト segment をスキップしても番号がずれないよう独立カウンタを使う。
+    """
     out = []
-    for i, seg in enumerate(segments, 1):
-        start = srt_timestamp(seg["start"])
-        end = srt_timestamp(seg["end"])
+    cue_num = 0
+    for seg in segments:
         text = seg["text"].strip()
         if not text:
             continue
-        out.append(f"{i}\n{start} --> {end}\n{text}\n")
+        cue_num += 1
+        start = srt_timestamp(seg["start"])
+        end = srt_timestamp(seg["end"])
+        out.append(f"{cue_num}\n{start} --> {end}\n{text}\n")
     return "\n".join(out)
 
 

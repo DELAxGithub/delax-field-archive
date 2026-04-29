@@ -251,19 +251,23 @@ def main():
             print(f"[yt] ⚠ thumbnail failed: {e}")
 
     # 字幕
+    # 内部ファイル命名 (例: foo.jp.srt) と YouTube API が要求する ISO 639-1 を分離する。
+    # YouTube は "ja" を要求するが、社内では歴史的に "jp" を使ってきたので変換マップを噛ます。
+    YT_LANG_MAP = {"jp": "ja"}
     if args.subtitles:
         for path_s in args.subtitles.split(","):
             path = Path(path_s.strip())
             if not path.exists() or not path.read_text().strip():
                 continue
-            # 拡張子から言語推定: foo.jp.srt → jp
+            # 拡張子から言語推定: foo.jp.srt → jp → ja
             stem_parts = path.name.split(".")
-            lang = stem_parts[-2] if len(stem_parts) >= 3 else "ja"
+            file_lang = stem_parts[-2] if len(stem_parts) >= 3 else "ja"
+            api_lang = YT_LANG_MAP.get(file_lang, file_lang)
             try:
-                upload_caption(yt, video_id, path, lang)
-                print(f"[yt] caption uploaded ({lang}) → {path.name}")
+                upload_caption(yt, video_id, path, api_lang)
+                print(f"[yt] caption uploaded ({api_lang}) → {path.name}")
             except Exception as e:
-                print(f"[yt] ⚠ caption {lang} failed: {e}")
+                print(f"[yt] ⚠ caption {api_lang} failed: {e}")
 
     # プレイリスト
     if args.playlist:
