@@ -1,7 +1,7 @@
 ---
 project: delax-field-archive
 last_updated: 2026-04-29
-last_commit: 9f88833 2026-04-22
+last_commit: c6b0baa 2026-04-29
 branch: main
 auto_generated: true
 ---
@@ -12,20 +12,17 @@ auto_generated: true
 30-50分ノーカット街歩き本編 (DWT/DBT) と 9:16 ショート量産パイプライン。
 `/field-render` + `/field-publish` + `/field-shorts` の3スキル体制で本編+ショートの
 YouTube 公開まで完結。マルセイユで本編1本+Shorts 1本を unlisted で公開済み。
-**git 上は 4/22 の初コミット1個だけだが、4/27〜28 で 11 ファイル分の
-パイプライン本体が未コミットで積まれている。コミット最優先。**
+**2026-04-29 に v0.4 全体を 1 コミットで投入完了 (c6b0baa)。
+独立 subagent モデレーションで Critical 0、Medium top3 を issue 化済み。**
 
 ## 直近の動き（last 7 days）
-- 最終コミット: 9f88833 (2026-04-22) 「initialize DELAX Field Archive with DWT_EP001」
-- 以降、**未コミット 11 ファイル**:
-  - `scripts/`: render_long.py / render_short.py / analyze_bgm.py /
-    extract_thumb_candidates.py / generate_description.py /
-    generate_shorts_caption.py / generate_subtitles.py / upload_youtube.py /
-    auth_youtube.py
-  - `docs/`: long-form-spec-v0.md / short-render-spec.md
-  - `episodes/TEST_marseille2_2026-04-02/`（テストエピソード）
-  - `CLAUDE.md` も未コミット変更あり
-- 公開済み: 本編「春のマルセイユ」16min unlisted (https://youtu.be/AGeuA2bx6xw)、
+- **最終コミット**: c6b0baa (2026-04-29) 「feat: add long-form and shorts rendering
+  pipeline with YouTube upload [moderated]」
+  14 files / 2719 insertions（pipeline scripts 9本、spec docs 2本、CLAUDE.md、
+  test episode、historian state ファイル）
+- **前コミット**: 9f88833 (2026-04-22) 「initialize DELAX Field Archive with DWT_EP001」
+- **未コミット変更**: なし（clean）
+- **公開済み**: 本編「春のマルセイユ」16min unlisted (https://youtu.be/AGeuA2bx6xw)、
   Shorts 30s Le Panier (https://youtu.be/isHdcKddMfk)
 
 ## 直近の devlog
@@ -38,8 +35,11 @@ YouTube 公開まで完結。マルセイユで本編1本+Shorts 1本を unliste
   マルセイユ素材で end-to-end 検証
 
 ## 進行中の判断 / 凍結中
-- **未コミット 11 ファイル**: 4/27 の長尺＆ショートパイプライン全成果が反映されていない。
-  次セッションで commit & push が最優先候補
+- **Medium top3 残置（issues #1-#3）**: `/moderate code` レビューで指摘の以下3点を
+  GitHub issue として後追い:
+  - #1 Caption lang code `jp → ja` (ISO 639-1) — captions API への言語タグ実害あり
+  - #2 BGM selection 無限ループガード（全候補曲 < crossfade `5.0s` のとき発火）
+  - #3 pure 関数の unit test 不在（9 スクリプトすべて）
 - **YouTube `defaultAudioLanguage=zxx` 問題**: API 400 で拒否 → `ja` で送って
   Studio で手動変更が現実解として確定（known issue）
 - **YT→Twitter/IG/TikTok 自動連携**: X API 有料化 ($200/月) と Meta API 審査ハードルで
@@ -49,7 +49,9 @@ YouTube 公開まで完結。マルセイユで本編1本+Shorts 1本を unliste
   `*.preview.jpg` を必ず併出する運用
 
 ## Open issues / PR
-- N/A（gh issue / PR ともに 0）
+- #1 Caption lang code: jp → ja (ISO 639-1)
+- #2 BGM selection: guard against infinite loop when all tracks shorter than crossfade
+- #3 Add unit tests for pure functions (chapters, BGM selection, SRT, geo)
 
 ## 未解決事項（コード内 TODO/FIXME）
 - N/A（コード内 TODO/FIXME ヒットなし）
