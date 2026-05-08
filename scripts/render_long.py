@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --quiet --with pillow python
-"""長尺街歩きレンダラ MVP v0.3 (Step 1+2+3 = 書き出し + overlay + BGM カタログ駆動ミックス)。
+"""長尺街歩きレンダラ v0.6 (Step 1+2+3 + cinematic opening modes)。
 
 入力: 動画 + 場所テロップ + 撮影日 + シリーズID
 出力: 4K SDR / HLG HEVC / HLG ProRes 422 HQ
@@ -8,12 +8,17 @@
 設計: docs/long-form-spec-v0.md
 流用元: scripts/render_short.py (draw_text_with_halo, safe zone)
 
+v0.6 (2026-05-08 ブリーフ反映): --opening-mode 追加
+- branded   — 現状互換 (黄色バッジ + 場所カード hold 6.5s + 9.8秒オープニング)
+- cinematic — hero clip (3-5s) prepend + 細身ラベル fade、バッジは hero 後に登場、heavy 場所カードは出さない
+- textless  — hero clip prepend のみ、テキスト一切なし、バッジは hero 後
+
 v0.2 改修 (2026-04-27 マルセイユ 1st レンダ後フィードバック):
 - 場所カード alpha 140 → 200 (明るい背景でも字が浮かない)
 - 場所カード PRIMARY 192 → 240px / halo offset 6
 - フォント統一 → 丸ゴ W4 (バッジと共通)
 - バッジ文字色 (40,30,0) → (60,40,10) ダークブラウン
-- オープニング演出: 絶景先 → 1〜2秒目に透かしフェードイン
+- オープニング演出 (branded): 絶景先 → 1〜2秒目に透かしフェードイン
   - 0:00-0:01: 絵だけ
   - 0:01-0:02: バッジ fade in
   - 0:01.5-0:02.5: 場所カード fade in
@@ -110,6 +115,29 @@ LOCATION_FADE_OUT_DURATION_S = 0.8  # 9.0s → 9.8s で fade out
 
 
 # ============================================================
+# Cinematic opening (v0.6, 細身フォント / hero clip prepend)
+# ============================================================
+FONT_THIN_CANDIDATES = [
+    "/System/Library/Fonts/HelveticaNeue.ttc",   # macOS 標準
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/System/Library/Fonts/SFNSDisplay.ttf",
+    "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+]
+OPENING_LABEL_FONT_SIZE = 96
+OPENING_LABEL_COLOR = (245, 245, 240, 235)
+OPENING_LABEL_HALO = (0, 0, 0, 180)
+OPENING_LABEL_HALO_OFFSET = 2
+OPENING_LABEL_Y_RATIO = 0.83   # 4K canvas 下方
+OPENING_LABEL_FADE_IN_START_S = 0.6
+OPENING_LABEL_FADE_IN_DURATION_S = 1.0
+# label の hold 終了は hero_duration - 1.0 (動的、render() 内で計算)
+OPENING_LABEL_FADE_OUT_DURATION_S = 0.8
+
+DEFAULT_HERO_DURATION_S = 4.0
+BADGE_FADE_AFTER_HERO_GAP_S = 0.3   # hero 終わってから 0.3s 後に badge fade in 開始
+
+
+# ============================================================
 # Helpers
 # ============================================================
 
@@ -147,6 +175,30 @@ def build_series_badge() -> Image.Image:
     draw.text((x0 + BADGE_PADDING_X, y0 + BADGE_PADDING_Y - 8),
               BADGE_TEXT, fill=BADGE_TEXT_COLOR, font=font)
 
+    return overlay
+
+
+def _resolve_thin_font() -> str:
+    for path in FONT_THIN_CANDIDATES:
+        if Path(path).exists():
+            return path
+    return FONT_ROUND_W4   # フォールバック
+
+
+def build_opening_label(text: str) -> Image.Image:
+    """cinematic mode の細身ラベル overlay (4K RGBA)。textless 時は呼ばれない。"""
+    overlay = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+    if not text:
+        return overlay
+    draw = ImageDraw.Draw(overlay)
+    font_path = _resolve_thin_font()
+    font = ImageFont.truetype(font_path, OPENING_LABEL_FONT_SIZE)
+    text_w = draw.textlength(text, font=font)
+    x = (CANVAS_W - text_w) / 2
+    y = int(CANVAS_H * OPENING_LABEL_Y_RATIO)
+    draw_text_with_halo(draw, (x, y), text, font,
+                        OPENING_LABEL_COLOR, OPENING_LABEL_HALO,
+                        halo_offset=OPENING_LABEL_HALO_OFFSET)
     return overlay
 
 
@@ -310,10 +362,23 @@ def make_chapters_metadata(duration_s: float, count: int, primary_label: str) ->
 # ============================================================
 
 def render(source: Path, output: Path, fmt: str,
-           badge_png: Path, location_png: Path, chapters_meta: Path,
+           badge_png: Path, location_png: Path | None, chapters_meta: Path,
            bgm_tracks: list[dict] | None,
            bgm_library: Path,
-           video_duration_s: float) -> None:
+           video_duration_s: float,
+           opening_mode: str = "branded",
+           hero_offset_s: float = 0.0,
+           hero_duration_s: float = 0.0,
+           label_png: Path | None = None,
+           hide_badge_during_opening: bool = False) -> None:
+    """video_duration_s は最終出力尺 (cinematic/textless では prepend 後の尺)。
+
+    opening_mode:
+      - branded:   現状互換 (badge fade@1.0, loc card 1.5..9.8s)
+      - cinematic: hero clip prepend (hero_duration_s) + 細身ラベル fade、loc card は出さない、
+                   badge は hero 後に fade in
+      - textless:  hero clip prepend のみ、ラベル/loc card なし、badge は hero 後に fade in
+    """
     if fmt == "sdr-h264":
         v_codec = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-preset", "fast"]
         v_extra = []
@@ -328,27 +393,73 @@ def render(source: Path, output: Path, fmt: str,
     else:
         sys.exit(f"unknown format: {fmt}")
 
-    # PNG オーバーレイは fade フィルタで時間制御するため、video stream 化する
-    # (-loop 1 -framerate で PNG を連続フレーム化)
-    video_filter = (
-        f"[1:v]format=rgba,"
-        f"fade=t=in:st={BADGE_FADE_IN_START_S}:d={BADGE_FADE_IN_DURATION_S}:alpha=1[badge_a];"
-        f"[2:v]format=rgba,"
-        f"fade=t=in:st={LOCATION_FADE_IN_START_S}:d={LOCATION_FADE_IN_DURATION_S}:alpha=1,"
-        f"fade=t=out:st={LOCATION_HOLD_END_S}:d={LOCATION_FADE_OUT_DURATION_S}:alpha=1[loc_a];"
-        f"[0:v][badge_a]overlay=0:0:shortest=1[v1];"
-        f"[v1][loc_a]overlay=0:0:shortest=1[outv]"
-    )
+    # ---- Inputs と video_filter を mode 別に組み立てる ----
+    # 入力レイアウト:
+    #   branded:   0=source, 1=badge, 2=loc, 3=meta, 4..=BGM
+    #   cinematic: 0=source, 1=badge, 2=label, 3=meta, 4..=BGM
+    #   textless:  0=source, 1=badge, 2=meta, 3..=BGM
+    inputs = ["-i", str(source),
+              "-loop", "1", "-framerate", str(FPS), "-i", str(badge_png)]
 
-    inputs = [
-        "-i", str(source),
-        "-loop", "1", "-framerate", str(FPS), "-i", str(badge_png),
-        "-loop", "1", "-framerate", str(FPS), "-i", str(location_png),
-        "-i", str(chapters_meta),
-    ]
+    if opening_mode == "branded":
+        if location_png is None:
+            sys.exit("branded mode requires location_png")
+        inputs += ["-loop", "1", "-framerate", str(FPS), "-i", str(location_png)]
+        inputs += ["-i", str(chapters_meta)]
+        bgm_input_offset = 4
+
+        video_filter = (
+            f"[1:v]format=rgba,"
+            f"fade=t=in:st={BADGE_FADE_IN_START_S}:d={BADGE_FADE_IN_DURATION_S}:alpha=1[badge_a];"
+            f"[2:v]format=rgba,"
+            f"fade=t=in:st={LOCATION_FADE_IN_START_S}:d={LOCATION_FADE_IN_DURATION_S}:alpha=1,"
+            f"fade=t=out:st={LOCATION_HOLD_END_S}:d={LOCATION_FADE_OUT_DURATION_S}:alpha=1[loc_a];"
+            f"[0:v][badge_a]overlay=0:0:shortest=1[v1];"
+            f"[v1][loc_a]overlay=0:0:shortest=1[outv]"
+        )
+
+    elif opening_mode in ("cinematic", "textless"):
+        hero_end = hero_offset_s + hero_duration_s
+        # badge fade in は hero 後 (hide_badge_during_opening=True が前提)
+        badge_fade_start = hero_duration_s + BADGE_FADE_AFTER_HERO_GAP_S if hide_badge_during_opening else BADGE_FADE_IN_START_S
+        # 動画の concat: hero クリップ → 元動画 (t=0 から)
+        video_concat = (
+            f"[0:v]trim=start={hero_offset_s}:end={hero_end},setpts=PTS-STARTPTS[hero_v];"
+            f"[0:v]setpts=PTS-STARTPTS[main_v];"
+            f"[hero_v][main_v]concat=n=2:v=1:a=0[v_concat];"
+        )
+
+        if opening_mode == "cinematic":
+            if label_png is None:
+                sys.exit("cinematic mode requires label_png")
+            inputs += ["-loop", "1", "-framerate", str(FPS), "-i", str(label_png)]
+            inputs += ["-i", str(chapters_meta)]
+            bgm_input_offset = 4
+
+            label_hold_end = max(hero_duration_s - 1.0, OPENING_LABEL_FADE_IN_START_S + OPENING_LABEL_FADE_IN_DURATION_S + 0.2)
+
+            video_filter = (
+                video_concat
+                + f"[1:v]format=rgba,fade=t=in:st={badge_fade_start}:d={BADGE_FADE_IN_DURATION_S}:alpha=1[badge_a];"
+                + f"[2:v]format=rgba,"
+                + f"fade=t=in:st={OPENING_LABEL_FADE_IN_START_S}:d={OPENING_LABEL_FADE_IN_DURATION_S}:alpha=1,"
+                + f"fade=t=out:st={label_hold_end}:d={OPENING_LABEL_FADE_OUT_DURATION_S}:alpha=1[label_a];"
+                + f"[v_concat][label_a]overlay=0:0:shortest=1[v1];"
+                + f"[v1][badge_a]overlay=0:0:shortest=1[outv]"
+            )
+        else:  # textless
+            inputs += ["-i", str(chapters_meta)]
+            bgm_input_offset = 3
+
+            video_filter = (
+                video_concat
+                + f"[1:v]format=rgba,fade=t=in:st={badge_fade_start}:d={BADGE_FADE_IN_DURATION_S}:alpha=1[badge_a];"
+                + f"[v_concat][badge_a]overlay=0:0:shortest=1[outv]"
+            )
+    else:
+        sys.exit(f"unknown opening_mode: {opening_mode}")
 
     if bgm_tracks:
-        bgm_input_offset = 4   # 0=source, 1=badge, 2=loc, 3=meta, 4..=BGM
         for t in bgm_tracks:
             inputs += ["-i", str(bgm_library / t["path"])]
         bgm_filter, bgm_label = build_bgm_filter_chain(bgm_tracks, video_duration_s, bgm_input_offset)
@@ -357,21 +468,33 @@ def render(source: Path, output: Path, fmt: str,
         print(f"[bgm] {len(bgm_tracks)} tracks, total ≈ "
               f"{sum(t['duration_sec'] for t in bgm_tracks):.1f}s "
               f"(target {video_duration_s:.1f}s)")
+    elif opening_mode in ("cinematic", "textless"):
+        # BGM オフ + cinematic/textless は元音声も hero 部分で concat 必要
+        audio_concat = (
+            f";[0:a]atrim=start={hero_offset_s}:end={hero_offset_s + hero_duration_s},asetpts=PTS-STARTPTS[hero_a];"
+            f"[0:a]asetpts=PTS-STARTPTS[main_a];"
+            f"[hero_a][main_a]concat=n=2:v=0:a=1[aout]"
+        )
+        filter_complex = video_filter + audio_concat
+        audio_map = ["-map", "[aout]"]
     else:
         filter_complex = video_filter
         audio_map = ["-map", "0:a?"]
 
+    # chapters_meta は inputs の中で source の次の次... mode によって位置が変わるので index を記録
+    # (branded: index=3, cinematic: index=3, textless: index=2)
+    meta_index = bgm_input_offset - 1   # bgm_input_offset の直前が meta
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "info",
         *inputs,
         "-filter_complex", filter_complex,
-        "-map", "[outv]", *audio_map, "-map_metadata", "3",
+        "-map", "[outv]", *audio_map, "-map_metadata", str(meta_index),
         *v_codec, *v_extra,
         "-c:a", "aac", "-b:a", "192k",
         "-shortest",
         str(output),
     ]
-    print(f"[ffmpeg] {source.name} → {output}")
+    print(f"[ffmpeg] {source.name} → {output} (mode={opening_mode})")
     subprocess.run(cmd, check=True)
 
 
@@ -400,45 +523,94 @@ def main():
                     help="シャッフル seed (再現用)")
     ap.add_argument("--no-bgm", action="store_true",
                     help="BGM オフ (元音声をそのまま使う)")
+    # Cinematic opening (v0.6 新設)
+    ap.add_argument("--opening-mode", choices=["branded", "cinematic", "textless"],
+                    default="branded",
+                    help="branded=現状互換 / cinematic=hero clip prepend + 細身ラベル / textless=hero clip のみ")
+    ap.add_argument("--hero-source-offset", type=float, default=None,
+                    help="cinematic/textless: 元動画内のドラマチックカット開始秒")
+    ap.add_argument("--hero-duration", type=float, default=DEFAULT_HERO_DURATION_S,
+                    help=f"cinematic/textless: hero クリップ尺 (デフォルト {DEFAULT_HERO_DURATION_S}s)")
+    ap.add_argument("--opening-label", default="",
+                    help="cinematic mode のみ。空文字なら textless と同じ挙動")
+    ap.add_argument("--badge-during-opening", action="store_true",
+                    help="cinematic/textless でも badge を従来通り (1.0s) から fade in")
     args = ap.parse_args()
 
     if not args.source.exists():
         sys.exit(f"source not found: {args.source}")
 
+    if args.opening_mode in ("cinematic", "textless"):
+        if args.hero_source_offset is None:
+            sys.exit(f"--opening-mode={args.opening_mode} requires --hero-source-offset")
+        if args.hero_duration <= 0:
+            sys.exit("--hero-duration must be positive")
+
     output = args.output or default_output_path(args.source, args.episode_id, args.output_format)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    duration_s = float(subprocess.check_output([
+    source_duration_s = float(subprocess.check_output([
         "ffprobe", "-v", "error", "-show_entries", "format=duration",
         "-of", "default=nw=1:nk=1", str(args.source)
     ]).decode().strip())
+
+    # cinematic/textless: 出力尺は元尺 + hero (prepend するため)
+    if args.opening_mode in ("cinematic", "textless"):
+        if args.hero_source_offset + args.hero_duration > source_duration_s:
+            sys.exit(f"hero clip range ({args.hero_source_offset}..{args.hero_source_offset + args.hero_duration}s) "
+                     f"exceeds source duration {source_duration_s:.1f}s")
+        total_duration_s = source_duration_s + args.hero_duration
+    else:
+        total_duration_s = source_duration_s
 
     badge = build_series_badge()
     badge_path = output.parent / f"_badge_{output.stem}.png"
     badge.save(badge_path)
 
-    location = build_location_card(args.location_primary, args.location_secondary)
-    location_path = output.parent / f"_location_{output.stem}.png"
-    location.save(location_path)
+    location_path: Path | None = None
+    label_path: Path | None = None
+    if args.opening_mode == "branded":
+        location = build_location_card(args.location_primary, args.location_secondary)
+        location_path = output.parent / f"_location_{output.stem}.png"
+        location.save(location_path)
+    elif args.opening_mode == "cinematic":
+        label_text = args.opening_label  # 空文字なら build_opening_label が透明 PNG を返す
+        label = build_opening_label(label_text)
+        label_path = output.parent / f"_label_{output.stem}.png"
+        label.save(label_path)
 
-    chapters_meta = make_chapters_metadata(duration_s, args.chapter_count, args.location_primary)
+    chapters_meta = make_chapters_metadata(total_duration_s, args.chapter_count, args.location_primary)
     chapters_path = output.parent / f"_chapters_{output.stem}.txt"
     chapters_path.write_text(chapters_meta)
 
-    print(f"[duration] {duration_s:.2f}s, chapters: {args.chapter_count}")
-    print(f"[overlays] {badge_path.name} / {location_path.name}")
+    print(f"[duration] source={source_duration_s:.2f}s, output={total_duration_s:.2f}s, "
+          f"chapters: {args.chapter_count}, mode={args.opening_mode}")
+    overlay_files = [badge_path.name]
+    if location_path:
+        overlay_files.append(location_path.name)
+    if label_path:
+        overlay_files.append(label_path.name)
+    print(f"[overlays] {' / '.join(overlay_files)}")
 
     bgm_tracks = None
     if not args.no_bgm:
         genres = tuple(g.strip() for g in args.bgm_genre.split(",") if g.strip())
-        bgm_tracks = select_bgm_tracks(args.bgm_library, duration_s, genres, args.bgm_seed)
+        bgm_tracks = select_bgm_tracks(args.bgm_library, total_duration_s, genres, args.bgm_seed)
 
     render(args.source, output, args.output_format, badge_path, location_path, chapters_path,
-           bgm_tracks, args.bgm_library, duration_s)
+           bgm_tracks, args.bgm_library, total_duration_s,
+           opening_mode=args.opening_mode,
+           hero_offset_s=args.hero_source_offset or 0.0,
+           hero_duration_s=args.hero_duration if args.opening_mode != "branded" else 0.0,
+           label_png=label_path,
+           hide_badge_during_opening=(args.opening_mode != "branded" and not args.badge_during_opening))
 
     if not args.keep_overlays:
         badge_path.unlink(missing_ok=True)
-        location_path.unlink(missing_ok=True)
+        if location_path:
+            location_path.unlink(missing_ok=True)
+        if label_path:
+            label_path.unlink(missing_ok=True)
         chapters_path.unlink(missing_ok=True)
     print(f"✓ {output}")
 

@@ -71,6 +71,18 @@ creative:
       suggested_platform: "twitter"
   notes: ""                      # 撮影時の気づき・次回改善点
 
+  # オープニング演出 (v0.6 / 2026-05-08 ブリーフ反映)
+  # render_long.py --opening-mode 経由で参照される (現状は CLI で都度指定、将来 yaml 直読み化)
+  opening:
+    mode: "branded"              # branded | cinematic | textless
+    # cinematic / textless 時のみ:
+    hero_clip:
+      source_offset_sec: 0       # 元動画内のドラマチックカット開始秒
+      duration_sec: 4            # 3〜5秒推奨
+    # cinematic 時のみ (空文字なら textless と同じ):
+    label: ""                    # 例: "Today's Destination" / "Coming Up" / "Walking Through Málaga"
+    badge_during_opening: false  # true で従来通り (1.0s 付近から badge fade in)
+
 # --- 公開管理セクション（公開時に追記） ---
 
 publish:

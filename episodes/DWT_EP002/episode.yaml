@@ -1,0 +1,142 @@
+# ============================================================
+# DWT_EP002 — Málaga Coastal Walking Tour
+# Baños del Carmen → Ensanche Centro
+# 2026-05-04 撮影、テスト撮影 → preset 確定 + パブリッシュフロー検証
+# ※ 2026-05-05 に DBT_EP001/ から DWT_EP002/ にリネーム済 (徒歩素材だったため)。
+# ⚠ GDPR: Insta360 X5 素材は **AI Face Blur 必須** (CLAUDE.md 規定)。
+#    本素材は未処理 → unlisted は可だが、public 公開前にブラー処理が必要。
+# ============================================================
+
+id: DWT_EP002
+series: DWT
+status: editing
+
+capture:
+  shot_date: "2026-05-04"
+  shot_start: "12:16:46"   # CEST
+  shot_end: "13:08:51"     # CEST
+  duration_sec: 2960       # DaVinci 書き出し後の実尺 (49:20)
+  camera: "Insta360 X5"
+  resolution: "3840x2160"  # rotation=90 で表示は 16:9 4K
+  fps: 24
+  raw_size_gb: 38.5        # _003 (23.7 GB) + _004 (16.3 GB) の合計
+
+geo:
+  capture_mode: "route"
+  gpx_file: "gpx/DWT_EP002.gpx"
+  start_coord: [36.721498, -4.379728]
+  end_coord: [36.715518, -4.423675]
+  distance_km: 4.4
+  elevation_gain_m: 7
+  location_name: "Baños del Carmen → Ensanche Centro, Málaga"
+  city: "Málaga"
+  country: "Spain"
+  landmarks:
+    - name: "Calle Bolivia / Baños del Carmen"
+      coord: [36.721498, -4.379728]
+      timestamp_sec: 0
+    - name: "El Morlaco"
+      coord: [36.722500, -4.388500]
+      timestamp_sec: 334
+    - name: "El Rocío"
+      coord: [36.722000, -4.392000]
+      timestamp_sec: 664
+    - name: "La Torrecilla"
+      coord: [36.721500, -4.395500]
+      timestamp_sec: 802
+    - name: "Bellavista"
+      coord: [36.720700, -4.398000]
+      timestamp_sec: 993
+    - name: "La Caleta"
+      coord: [36.719500, -4.402500]
+      timestamp_sec: 1299
+    - name: "La Malagueta"
+      coord: [36.718500, -4.412000]
+      timestamp_sec: 1990
+    - name: "Port of Málaga"
+      coord: [36.718500, -4.415000]
+      timestamp_sec: 2281
+    - name: "Palmeral de las Sorpresas"
+      coord: [36.717500, -4.420000]
+      timestamp_sec: 2408
+    - name: "Ensanche Centro"
+      coord: [36.715518, -4.423675]
+      timestamp_sec: 2847
+
+weather:
+  condition: "clear"     # preview frames で確認 (青空+わずかな雲)
+  temp_c: 0              # open-meteo 後追いで埋める
+  wind_kmh: 0
+  humidity: 0
+  source: "open-meteo"
+
+creative:
+  episode_title: "[4K Walking ASMR] Málaga 海岸ルート — Baños del Carmen から Ensanche Centro へ"
+  title_en: "[4K Walking ASMR] Málaga Coastal Route - Baños del Carmen to Ensanche Centro, No Talking"
+  theme: "5月の晴天、地中海と Paseo Marítimo を抜けて旧市街へ"
+  mood: "ambient"
+  music_policy: "ambient-only"
+  chapters:
+    - label: "Baños del Carmen"
+      timestamp_sec: 0
+    - label: "El Morlaco"
+      timestamp_sec: 334
+    - label: "El Rocío"
+      timestamp_sec: 664
+    - label: "La Torrecilla"
+      timestamp_sec: 802
+    - label: "Bellavista"
+      timestamp_sec: 993
+    - label: "La Caleta"
+      timestamp_sec: 1299
+    - label: "La Malagueta"
+      timestamp_sec: 1990
+    - label: "Port of Málaga"
+      timestamp_sec: 2281
+    - label: "Palmeral de las Sorpresas"
+      timestamp_sec: 2408
+    - label: "Ensanche Centro"
+      timestamp_sec: 2847
+  highlight_moments:
+    - description: "Baños del Carmen 海岸スタート"
+      timestamp_sec: 30
+      duration_sec: 60
+      suggested_platform: "shorts"
+    - description: "Bellavista 椰子並木の歩道"
+      timestamp_sec: 900
+      duration_sec: 90
+      suggested_platform: "reels"
+    - description: "Port of Málaga テンセグリティ屋根"
+      timestamp_sec: 2280
+      duration_sec: 60
+      suggested_platform: "twitter"
+  notes: |
+    GPS テロップパイプライン (walking-tour-pipeline 02a/02b/02c) の50分本編
+    初回検証素材。preset v1 確定 (Sharp Cut + 1行運用、Furureai Walking
+    Tour スタイル) を実機検証。Insta360 X5 fw 内蔵GPS 1Hz で 3,125点 /
+    52:05 連続記録 → smooth60 で 10 captions に整理。
+    Euro-Quest 4K v1.1 の「序盤10本テロップ禁止」ルール適用前のテスト撮影
+    として位置づけ、unlisted 公開で品位確認のみ。
+    ※chapters 数が10で v1.1 制限 (5-8) を超えているため、本格運用時は
+    主要ランドマーク (開始 / Tier回収 / 終了) のみに削減する。
+
+publish:
+  youtube_url: ""
+  published_at: ""
+  thumbnail_file: ""
+  playlist: "Málaga Walking"
+  derivatives:
+    - platform: shorts
+      url: ""
+      published_at: ""
+    - platform: reels
+      url: ""
+      published_at: ""
+    - platform: twitter
+      url: ""
+      published_at: ""
+
+archive:
+  created_at: "2026-05-05"
+  updated_at: "2026-05-05"
+  git_commit: ""

@@ -1,0 +1,163 @@
+episode_id: DWT_EP002
+source_video: ''
+duration_sec: 2960
+n_locations: 10
+_note: description_jp/en/es は Claude Code 内で対話的に埋める。matched_landmark_name は SRT cue
+  の時刻に最も近い episode.yaml landmark。
+locations:
+- id: L01
+  timestamp_start: 0.5
+  timestamp_end: 310.0
+  duration_sec: 309.5
+  primary: Calle Bolivia
+  secondary: Baños del Carmen
+  coord:
+  - 36.721498
+  - -4.379728
+  chapters_raw_ranges:
+  - 1-14
+  role_avant: start
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: Calle Bolivia / Baños del Carmen
+- id: L02
+  timestamp_start: 334.5
+  timestamp_end: 641.0
+  duration_sec: 306.5
+  primary: Paseo Marítimo Pablo Ruiz Picasso
+  secondary: El Morlaco
+  coord:
+  - 36.7225
+  - -4.3885
+  chapters_raw_ranges:
+  - 16-28
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: El Morlaco
+- id: L03
+  timestamp_start: 664.5
+  timestamp_end: 779.0
+  duration_sec: 114.5
+  primary: Paseo Marítimo Pablo Ruiz Picasso
+  secondary: El Rocío
+  coord:
+  - 36.722
+  - -4.392
+  chapters_raw_ranges:
+  - 30-34
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: El Rocío
+- id: L04
+  timestamp_start: 802.5
+  timestamp_end: 970.0
+  duration_sec: 167.5
+  primary: Paseo Marítimo Pablo Ruiz Picasso
+  secondary: La Torrecilla
+  coord:
+  - 36.7215
+  - -4.3955
+  chapters_raw_ranges:
+  - 36-42
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: La Torrecilla
+- id: L05
+  timestamp_start: 993.5
+  timestamp_end: 1277.0
+  duration_sec: 283.5
+  primary: Paseo Marítimo Pablo Ruiz Picasso
+  secondary: Bellavista
+  coord:
+  - 36.7207
+  - -4.398
+  chapters_raw_ranges:
+  - 44-56
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: Bellavista
+- id: L06
+  timestamp_start: 1299.5
+  timestamp_end: 1968.0
+  duration_sec: 668.5
+  primary: Paseo Marítimo Pablo Ruiz Picasso
+  secondary: La Caleta
+  coord:
+  - 36.7195
+  - -4.4025
+  chapters_raw_ranges:
+  - 58-88
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: La Caleta
+- id: L07
+  timestamp_start: 1990.5
+  timestamp_end: 2261.0
+  duration_sec: 270.5
+  primary: Paseo Marítimo Pablo Ruiz Picasso
+  secondary: La Malagueta
+  coord:
+  - 36.7185
+  - -4.412
+  chapters_raw_ranges:
+  - 90-102
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: La Malagueta
+- id: L08
+  timestamp_start: 2281.5
+  timestamp_end: 2384.0
+  duration_sec: 102.5
+  primary: Pasaje Doctor Carrillo Casaux
+  secondary: Málaga
+  coord:
+  - 36.7185
+  - -4.415
+  chapters_raw_ranges:
+  - 104-108
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: Port of Málaga
+- id: L09
+  timestamp_start: 2408.5
+  timestamp_end: 2955.0
+  duration_sec: 546.5
+  primary: Palmeral de las Sorpresas
+  secondary: Málaga
+  coord:
+  - 36.715518
+  - -4.423675
+  chapters_raw_ranges:
+  - 110-134
+  role_avant: middle
+  description_jp: ''
+  description_en: ''
+  description_es: ''
+  matched_landmark_name: Ensanche Centro
+- id: L10
+  timestamp_start: 2960.0
+  timestamp_end: 2960.0
+  duration_sec: 0.0
+  primary: Calle Casas de Campos
+  secondary: Ensanche Centro
+  coord: null
+  chapters_raw_ranges: []
+  role_avant: goal
+  description_jp: ''
+  description_en: ''
+  description_es: ''
