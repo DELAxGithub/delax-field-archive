@@ -1,0 +1,84 @@
+id: TEST_malaga-coastal_2026-05-11
+series: DBT
+status: draft
+
+capture:
+  shot_date: '2026-05-11'
+  shot_start: ''
+  shot_end: ''
+  duration_sec: 0
+  camera: ''
+  resolution: ''
+  fps: 0
+  raw_size_gb: 0.0
+
+geo:
+  capture_mode: route
+  gpx_file: gpx/TEST_malaga-coastal_2026-05-11.gpx
+  start_coord:
+  - 36.72148
+  - -4.38144
+  end_coord:
+  - 36.72148
+  - -4.38144
+  distance_km: 55.87
+  elevation_gain_m: 0
+  location_name: Málaga Port → Torre del Mar → Málaga Port (Senda Litoral)
+  city: Málaga
+  country: Spain
+  landmarks:
+  - name: Málaga Port (start/end)
+    coord:
+    - 36.72148
+    - -4.38144
+    timestamp_sec: 0
+  - name: Rincón de la Victoria coast (km 10)
+    coord:
+    - 36.71357
+    - -4.27562
+    timestamp_sec: 0
+  - name: Benajarafe (km 20)
+    coord:
+    - 36.72033
+    - -4.16840
+    timestamp_sec: 0
+  - name: Torre del Mar (km 28, turnaround)
+    coord:
+    - 36.73982
+    - -4.09759
+    timestamp_sec: 0
+
+weather:
+  condition: ''
+  temp_c: 0
+  wind_kmh: 0
+  humidity: 0
+  source: ''
+
+creative:
+  episode_title: ''
+  title_en: ''
+  theme: ''
+  mood: ''
+  music_policy: ''
+  chapters:
+  - label: Opening
+    timestamp_sec: 0
+  - label: ''
+    timestamp_sec: 0
+  - label: Closing
+    timestamp_sec: 0
+  highlight_moments:
+  - description: TBD — Rincón de la Victoria coastal stretch
+    timestamp_sec: 0
+  - description: TBD — Benajarafe midpoint
+    timestamp_sec: 0
+  - description: TBD — Torre del Mar turnaround
+    timestamp_sec: 0
+  notes: 'Test ride for `/field-render` + `/field-publish` pipeline dry-run. Scout Board route: EQ-ES-MAL-BIKE-COASTAL-001. Not for publish — pipeline shakedown only (LP100-independent).'
+
+archive:
+  created_at: '2026-05-11'
+  updated_at: '2026-05-11'
+  git_commit: ''
+  scout_route_id: EQ-ES-MAL-BIKE-COASTAL-001
