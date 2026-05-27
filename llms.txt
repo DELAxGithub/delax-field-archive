@@ -1,0 +1,44 @@
+# DELAX Field Archive
+
+> Integrated pipeline that asset-izes street-walking and cycling footage from Málaga-based filmmaker DELAX (Hiroshi Kodera) and serializes it as Ambient Walk/Ride Tour episodes on the Tachi Radio YouTube channel. Pure environment audio, no narration.
+
+## What this is
+
+DELAX Field Archive is the metadata + automation backbone behind two YouTube series:
+
+| Code | Series | Primary camera |
+|---|---|---|
+| **DWT** | DELAX Walking Tour | Insta360 X5 |
+| **DBT** | DELAX Bike Tour | Sony ZV-E10 II |
+
+Naming convention: `{SERIES}_EP{###}_{location-slug}_{YYYYMMDD}` (e.g. `DWT_EP001_Pedregalejo-Centro_20260428`).
+
+The repo holds episode YAMLs, GPX tracks, thumbnail templates, and Python scripts that auto-fill metadata (ffprobe for capture meta, OSM Nominatim for location, Open-Meteo for weather). Video / audio source files are deliberately gitignored.
+
+- Editorial style: no narration, location captions only (from GPS), ambient sound, BGM only when needed
+- Privacy: GDPR-compliant face blur required for both cameras (Insta360 AI Face Blur / DaVinci Resolve Face Refinement)
+- Quality bar: NHK-documentary craft × Vibe Coder velocity
+
+## Output formats
+
+- 9:16 short clips (1080×1920) — for YouTube Shorts / Instagram Reels / TikTok with multi-platform safe-zones enforced
+- 30–50min long-form HLG videos — "B-Music style" no-cut ambient tours with chapter markers + Lofi BGM mix
+
+## Where to start
+
+- [README](https://github.com/DELAxGithub/delax-field-archive/blob/main/README.md) — series overview, directory structure, workflow
+- [CLAUDE.md](https://github.com/DELAxGithub/delax-field-archive/blob/main/CLAUDE.md) — project context, equipment workflows, agent rules
+- [docs/workflow.md](https://github.com/DELAxGithub/delax-field-archive/blob/main/docs/workflow.md) — standard end-to-end workflow
+- [docs/face-blur-guide.md](https://github.com/DELAxGithub/delax-field-archive/blob/main/docs/face-blur-guide.md) — GDPR face-blur procedures
+- [docs/](https://github.com/DELAxGithub/delax-field-archive/tree/main/docs) — short-render spec, long-form spec
+- [episodes/_template/episode.yaml](https://github.com/DELAxGithub/delax-field-archive/blob/main/episodes/_template/episode.yaml) — episode YAML schema
+- [scripts/](https://github.com/DELAxGithub/delax-field-archive/tree/main/scripts) — metadata extraction + render scripts
+- [episodes/](https://github.com/DELAxGithub/delax-field-archive/tree/main/episodes) — per-episode YAML, GPX, thumbnails
+
+## What this is NOT
+
+- Not a video host — raw footage stays on external SSD; YouTube is the publication surface
+- Not a narration-driven travel vlog — strictly no-narration ambient walks/rides
+- Not a transcription pipeline — see [csvtoxml](https://github.com/DELAxGithub/csvtoxml) and the Whisper-based Platto pipelines for that
+- Not a video editor — editing is done in DaVinci Resolve / ffmpeg; this repo holds metadata and automation only
+- Not a generic field-recording template — the directory layout, naming, and YAML schema are DELAX-specific
