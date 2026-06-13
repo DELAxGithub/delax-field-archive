@@ -179,6 +179,9 @@ def main():
     ap.add_argument("--playlist", default=None)
     ap.add_argument("--tags", default=None,
                     help="カンマ区切り追加タグ")
+    ap.add_argument("--replace-tags", action="store_true",
+                    help="--tags を DEFAULT_TAGS に足さず、--tags のみを内部タグに使う"
+                         "（別番組=たっちレディオ等で WalkingTour 既定を付けない）")
     ap.add_argument("--privacy", default="private",
                     choices=["private", "unlisted", "public"])
     ap.add_argument("--publish-at", default=None,
@@ -212,7 +215,7 @@ def main():
         thumb = thumbs[0] if thumbs else None
 
     # tags
-    tags = list(DEFAULT_TAGS)
+    tags = [] if args.replace_tags else list(DEFAULT_TAGS)
     if args.tags:
         tags.extend([t.strip() for t in args.tags.split(",") if t.strip()])
 
