@@ -20,12 +20,28 @@
 """
 from __future__ import annotations
 import argparse
+import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+
+# Slice 1 基盤: 検証 / ffprobe / content-hash は field_shorts に切り出し、
+# render_short.py からは呼ぶだけにする (レンダー処理は本ファイルに残す)。
+# field_shorts.__init__ は eager import しないので追加依存は PIL + stdlib のみ
+# = shebang の `uv run --with pillow` のまま動く。
+from field_shorts.ffprobe import ProbeError, probe_duration, verify_video
+from field_shorts.hashing import dropbox_content_hash
+from field_shorts.paths import safe_path_component, same_file
+from field_shorts.validation import (
+    ValidationError,
+    validate_clip_range,
+    validate_cta_duration,
+    validate_telop_width,
+)
 
 # 出力先ポリシー: 重量級生成物は ~/Dropbox/delax-reports/<project>/<id>/ (DELAX 共通規約)。
 # $DELAX_REPORTS_ROOT で上書き可。未設定時は ~/Dropbox/delax-reports/。
@@ -35,7 +51,7 @@ DEFAULT_OUTPUT_BASE = Path(
 
 
 def default_output_path(source: Path, episode_id: str | None) -> Path:
-    sub = episode_id if episode_id else "_unsorted"
+    sub = safe_path_component(episode_id, label="episode-id") if episode_id else "_unsorted"
     return DEFAULT_OUTPUT_BASE / sub / f"short_{source.stem}.mp4"
 
 
@@ -180,8 +196,11 @@ def build_cta_overlay(cta_text: str) -> Image.Image:
     return overlay
 
 
-def render(source: Path, output: Path, start_s: float, duration_s: float,
-           overlay_png: Path, cta_png: Path | None, cta_duration_s: float) -> None:
+def build_ffmpeg_cmd(source: Path, output: Path, start_s: float, duration_s: float,
+                     overlay_png: Path, cta_png: Path | None,
+                     cta_duration_s: float) -> list[str]:
+    """ffmpeg argv. `+faststart` moves the moov atom to the front so the Web can
+    stream-seek the preview. Pure (no subprocess) so the flags are unit-testable."""
     inputs = [
         "-ss", str(start_s),
         "-i", str(source),
@@ -203,7 +222,7 @@ def render(source: Path, output: Path, start_s: float, duration_s: float,
             f"[v][1:v]overlay=0:0[outv]"
         )
 
-    cmd = [
+    return [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         *inputs,
         "-t", str(duration_s),
@@ -211,11 +230,67 @@ def render(source: Path, output: Path, start_s: float, duration_s: float,
         "-map", "[outv]", "-map", "0:a?",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20",
         "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
         str(output),
     ]
+
+
+def render(source: Path, output: Path, start_s: float, duration_s: float,
+           overlay_png: Path, cta_png: Path | None, cta_duration_s: float) -> None:
+    cmd = build_ffmpeg_cmd(source, output, start_s, duration_s,
+                           overlay_png, cta_png, cta_duration_s)
     print(f"[ffmpeg] {source.name} → {output} (start={start_s}s, dur={duration_s}s"
           f"{', cta=on' if cta_png else ''})")
-    subprocess.run(cmd, check=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        # ffmpeg の stderr を握り潰さず原因を残す (運用時の切り分け用)。
+        raise RuntimeError(
+            f"ffmpeg failed (exit {proc.returncode}): "
+            f"{(proc.stderr or proc.stdout).strip()}"
+        )
+
+
+def temp_render_path(output: Path) -> Path:
+    """Hidden sibling temp keeping the .mp4 suffix so ffmpeg picks the mp4 muxer
+    and os.replace stays atomic (same directory → same filesystem)."""
+    return output.with_name(f".{output.stem}.tmp{output.suffix}")
+
+
+def ensure_output_distinct_from_source(source: Path, output: Path) -> None:
+    """Refuse to render when --output resolves to --source. Otherwise the atomic
+    os.replace at the end would overwrite the original footage with the short."""
+    if same_file(source, output):
+        raise ValueError(
+            f"--output must differ from --source (both resolve to {output.resolve()})"
+        )
+
+
+def write_render_record(output: Path, *, content_hash: str, episode_id: str | None,
+                        source: Path, start_s: float, duration_s: float,
+                        location_primary: str, location_secondary: str,
+                        cta_text: str | None) -> Path:
+    """Durable sidecar next to the mp4. The Web/poller read `content_hash` to
+    confirm the bytes they are about to publish are the ones rendered here
+    (byte-exact with the tachi pipeline's dropbox_content_hash)."""
+    record = {
+        "schema_version": 1,
+        "episode_id": episode_id,
+        "output": str(output),
+        "content_hash": content_hash,
+        "faststart": True,
+        "source_name": Path(source).name,
+        "start_s": start_s,
+        "duration_s": duration_s,
+        "location_primary": location_primary,
+        "location_secondary": location_secondary,
+        "cta_text": cta_text,
+        "rendered_at": datetime.now(timezone.utc).isoformat(),
+    }
+    record_path = output.with_name(f"{output.stem}.render.json")
+    record_path.write_text(
+        json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    return record_path
 
 
 def main():
@@ -241,30 +316,86 @@ def main():
     if not args.source.exists():
         sys.exit(f"source not found: {args.source}")
 
-    output = args.output or default_output_path(args.source, args.episode_id)
+    # ── 入力検証 (ffmpeg を回す前に fail-closed) ────────────────────────
+    try:
+        source_duration = probe_duration(args.source)
+    except ProbeError as e:
+        sys.exit(f"ffprobe failed on source: {e}")
+    try:
+        validate_clip_range(args.start, args.duration, source_duration)
+        validate_telop_width(args.location_primary, FONT_BOLD,
+                             LOCATION_PRIMARY_FONT, label="location-primary")
+        validate_telop_width(args.location_secondary, FONT_LIGHT,
+                             LOCATION_SECONDARY_FONT, label="location-secondary")
+        if args.cta_text:
+            validate_cta_duration(args.cta_duration_s, args.duration)
+            validate_telop_width(args.cta_text, FONT_BOLD, CTA_FONT_SIZE,
+                                 label="cta-text")
+    except ValidationError as e:
+        sys.exit(f"input validation failed: {e}")
+
+    try:
+        output = args.output or default_output_path(args.source, args.episode_id)
+    except ValueError as e:  # unsafe --episode-id path component
+        sys.exit(f"input validation failed: {e}")
+    # 元素材を最終 atomic rename で踏み潰さない (--output == --source を拒否)。
+    try:
+        ensure_output_distinct_from_source(args.source, output)
+    except ValueError as e:
+        sys.exit(str(e))
     output.parent.mkdir(parents=True, exist_ok=True)
 
+    # overlay/cta PNG は output.stem 紐付けの隠しファイル (temp mp4 と同じ命名規律で
+    # 別 output の並行レンダーと衝突させない)。
     overlay = build_overlay(args.series_label, args.ep_chip,
                             args.location_primary, args.location_secondary)
-    overlay_path = output.parent / f"_overlay_{output.stem}.png"
+    overlay_path = output.parent / f".{output.stem}.overlay.png"
     overlay.save(overlay_path)
     print(f"[overlay] {overlay_path}")
 
     cta_path = None
     if args.cta_text:
         cta_overlay = build_cta_overlay(args.cta_text)
-        cta_path = output.parent / f"_cta_{output.stem}.png"
+        cta_path = output.parent / f".{output.stem}.cta.png"
         cta_overlay.save(cta_path)
         print(f"[cta] {cta_path} (last {args.cta_duration_s}s)")
 
-    render(args.source, output, args.start, args.duration,
-           overlay_path, cta_path, args.cta_duration_s)
+    # ── temp 出力 → ffprobe 検証 → atomic rename ───────────────────────
+    # 半端な mp4 を最終パスに残さない。verify 失敗時は temp を破棄し
+    # 最終ファイルは生まれない (poller の honest-success が誤検知しない)。
+    tmp_output = temp_render_path(output)
+    try:
+        render(args.source, tmp_output, args.start, args.duration,
+               overlay_path, cta_path, args.cta_duration_s)
+        try:
+            verify_video(tmp_output, expect_duration=args.duration)
+        except ProbeError as e:
+            sys.exit(f"rendered file failed verification: {e}")
+        os.replace(tmp_output, output)  # atomic
+    finally:
+        if tmp_output.exists():
+            tmp_output.unlink(missing_ok=True)
+        if not args.keep_overlay:
+            overlay_path.unlink(missing_ok=True)
+            if cta_path:
+                cta_path.unlink(missing_ok=True)
 
-    if not args.keep_overlay:
-        overlay_path.unlink(missing_ok=True)
-        if cta_path:
-            cta_path.unlink(missing_ok=True)
+    # ── content hash を記録 (Web/poller が完成 mp4 を byte 照合できる) ──
+    content_hash = dropbox_content_hash(output)
+    record_path = write_render_record(
+        output,
+        content_hash=content_hash,
+        episode_id=args.episode_id,
+        source=args.source,
+        start_s=args.start,
+        duration_s=args.duration,
+        location_primary=args.location_primary,
+        location_secondary=args.location_secondary,
+        cta_text=args.cta_text,
+    )
     print(f"✓ {output}")
+    print(f"  content_hash={content_hash}")
+    print(f"  record={record_path}")
 
 
 if __name__ == "__main__":
