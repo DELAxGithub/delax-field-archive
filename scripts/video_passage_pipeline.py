@@ -480,6 +480,38 @@ def command_upload(args) -> None:
     subprocess.run(cmd, check=True)
 
 
+def command_ingest_passage(args) -> None:
+    """Replace the manifest's cues with a reviewed passage_info's shared cue body,
+    mapped onto THIS episode's measured telemetry (S3-C). The live-action renderer thus
+    consumes the SAME reviewed cues as the Street View side. Approval is reset to draft
+    (the new cues must be re-reviewed + re-approved); the passage_info_hash is recorded
+    so both renderers carry the same cross-renderer key."""
+    from delax_core.passage_info import passage_info_hash, validate_passage_info
+    from passage_info_field import build_field_cues
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    passage_info = json.loads(args.passage_info.read_text(encoding="utf-8"))
+    # full core integrity gate — schema + semantics + recomputed hash (reject tampering)
+    problems = validate_passage_info(passage_info)
+    if problems:
+        sys.exit("passage_info invalid: " + "; ".join(problems[:5]))
+    if passage_info.get("generation_state") != "reviewed":
+        sys.exit("passage_info must be 'reviewed' before ingest")
+    if passage_info.get("info_hash") != passage_info_hash(passage_info):
+        sys.exit("passage_info info_hash does not match content (tampered?)")
+    cues = build_field_cues(
+        passage_info, manifest["telemetry"],
+        default_duration_s=args.duration, video_duration_s=manifest["source"].get("duration_s"))
+    if not cues:
+        sys.exit("no passage_info cue mapped onto this episode's telemetry")
+    manifest["cues"] = cues
+    manifest["passage_info_hash"] = passage_info["info_hash"]
+    manifest["approval"] = {"status": "draft", "approved_at": None,
+                            "approved_by": None, "content_hash": None}
+    save_manifest(args.manifest, manifest)
+    print(f"[ingest-passage] {len(cues)} cue(s) from passage_info "
+          f"{passage_info['info_hash'][:12]} -> {args.manifest} (approval reset; review + approve)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -525,6 +557,14 @@ def build_parser() -> argparse.ArgumentParser:
     upload.add_argument("--thumbnail", type=Path)
     upload.add_argument("--playlist")
     upload.set_defaults(func=command_upload)
+
+    ingest = sub.add_parser("ingest-passage")
+    ingest.add_argument("--manifest", type=Path, required=True)
+    ingest.add_argument("--passage-info", type=Path, required=True,
+                        help="reviewed passage_info.json (shared with the Street View side)")
+    ingest.add_argument("--duration", type=float, default=8.0,
+                        help="per-cue display window seconds (clamped to no overlap / video end)")
+    ingest.set_defaults(func=command_ingest_passage)
     return parser
 
 
