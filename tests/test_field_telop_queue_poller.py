@@ -205,6 +205,19 @@ def test_proxy_dropbox_path():
         P.proxy_dropbox_path("../etc")
 
 
+def test_episode_id_must_match_core_schema():
+    # episode_id must be ^[A-Z0-9_]+$ (matches delax_core manifest schema) so a
+    # queue-accepted id is also a valid passage_v1 project.episode_id.
+    assert P.EPISODE_ID.match("DWT_EP002") and P.EPISODE_ID.match("TEST_MARSEILLE2")
+    for bad in ("TEST_marseille2_2026-04-02", "dwt_ep002", "EP-01", "a/b"):
+        assert not P.EPISODE_ID.match(bad)
+    # rejected at queue time (parse_job), not only at manifest-approve time
+    with pytest.raises(PollerError):
+        P.parse_job({**_job(), "episode_id": "TEST_marseille2_2026-04-02"})
+    with pytest.raises(PollerError, match="unsafe episode_id"):
+        P.proxy_dropbox_path("test-marseille2")
+
+
 def test_build_proxy_command_reuses_ffmpeg_builder():
     cmd = P.build_proxy_command("/Volumes/x/edit.mp4", "/Users/d/Dropbox/DELAX_field/x.mp4")
     assert isinstance(cmd, list) and cmd

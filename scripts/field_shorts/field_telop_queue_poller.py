@@ -40,7 +40,11 @@ SHA_HEX = re.compile(r"^[0-9a-f]{64}$")
 GIT_SHA = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 # UTC only: "...Z" (Web toISOString) or "...+00:00" (delax_core approve_manifest).
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$")
-EPISODE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
+# Must match delax_core.review's manifest schema (^[A-Z0-9_]+$) so an episode_id
+# that the queue accepts can also be a passage_v1 manifest project.episode_id.
+# (Field episode DIR names like "TEST_marseille2_2026-04-02" — lowercase/hyphens —
+# are NOT valid here; use a normalized id e.g. "TEST_MARSEILLE2" / "DWT_EP002".)
+EPISODE_ID = re.compile(r"^[A-Z0-9_]+$")
 CUE_ID = re.compile(r"^cue-\d{3,5}$")
 GH_LOGIN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 OVERLAY_ID = re.compile(r"^\d{8}T\d{6}Z-cue-\d{3,5}-[a-z0-9]{4,16}$")
