@@ -79,10 +79,12 @@ def test_execute_renders_writes_result_moves_done(tmp_path):
     proxied = []
     res = runner.process_one(
         c, OID, registry_path=reg, dropbox_local_root=tmp_path, now="2026-06-18T01:00:00Z",
-        execute=True, render_fn=lambda rp, m, r: rendered,
+        execute=True, render_fn=lambda rp, m, r, output_path: rendered,
         proxy_fn=lambda s, d: proxied.append((str(s), str(d))))
     assert res["status"] == "done" and res["overlay_sha"] == OVERLAY_SHA
     assert res["output_content_hash"] == "9" * 64
+    # output recorded as a Dropbox-relative path (no absolute path)
+    assert res["output_path"] == f"field-telop/outputs/DBT_EP003/{OID}.mp4"
     # moved: approved-ready gone, done present, result written
     assert c.read_json(q.job_path("approved-ready", OID)) is None
     assert c.read_json(q.job_path("done", OID))["status"] == "done"
@@ -95,7 +97,7 @@ def test_execute_render_failure_moves_failed(tmp_path):
     c = _client_with_job()
     reg = _registry(tmp_path)
 
-    def boom_render(rp, m, r):
+    def boom_render(rp, m, r, output_path):
         raise RuntimeError("ffmpeg exploded")
 
     res = runner.process_one(c, OID, registry_path=reg, dropbox_local_root=tmp_path,
@@ -112,7 +114,7 @@ def test_execute_unregistered_source_fails_closed(tmp_path):
     reg.write_text(json.dumps({"version": 1, "sources": {}}))
     res = runner.process_one(c, OID, registry_path=reg, dropbox_local_root=tmp_path,
                              now="2026-06-18T01:00:00Z", execute=True,
-                             render_fn=lambda rp, m, r: {"content_hash": "9" * 64, "overlay_sha": OVERLAY_SHA},
+                             render_fn=lambda rp, m, r, output_path: {"content_hash": "9" * 64, "overlay_sha": OVERLAY_SHA},
                              proxy_fn=lambda s, d: None)
     assert res["status"] == "failed"  # SourceNotAllowed → failed, never renders
 
@@ -121,7 +123,7 @@ def test_failed_result_error_redacts_source_path(tmp_path):
     c = _client_with_job()
     reg = _registry(tmp_path)
 
-    def leaky_render(rp, m, r):
+    def leaky_render(rp, m, r, output_path):
         raise RuntimeError("render died on /Volumes/cam/DBT_EP003/secret.mp4")
 
     res = runner.process_one(c, OID, registry_path=reg, dropbox_local_root=tmp_path,
@@ -153,7 +155,7 @@ def test_result_has_no_source_path(tmp_path):
     reg = _registry(tmp_path)
     res = runner.process_one(
         c, OID, registry_path=reg, dropbox_local_root=tmp_path, now="t", execute=True,
-        render_fn=lambda rp, m, r: {"content_hash": "9" * 64, "overlay_sha": OVERLAY_SHA},
+        render_fn=lambda rp, m, r, output_path: {"content_hash": "9" * 64, "overlay_sha": OVERLAY_SHA},
         proxy_fn=lambda s, d: None)
     blob = json.dumps(res)
     assert "/Volumes/" not in blob and "source" not in blob and str(tmp_path) not in blob
@@ -164,6 +166,6 @@ def test_run_once_processes_all_approved_ready(tmp_path):
     reg = _registry(tmp_path)
     results = runner.run_once(c, registry_path=reg, dropbox_local_root=tmp_path,
                               now="t", execute=True,
-                              render_fn=lambda rp, m, r: {"content_hash": "9" * 64, "overlay_sha": OVERLAY_SHA},
+                              render_fn=lambda rp, m, r, output_path: {"content_hash": "9" * 64, "overlay_sha": OVERLAY_SHA},
                               proxy_fn=lambda s, d: None)
     assert len(results) == 1 and results[0]["status"] == "done"

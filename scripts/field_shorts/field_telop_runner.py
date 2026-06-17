@@ -23,6 +23,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -50,6 +51,17 @@ def proxy_local_path(dropbox_local_root: str | Path, episode_id: str) -> Path:
     return Path(dropbox_local_root).expanduser() / rel
 
 
+def output_rel_path(episode_id: str, job_id: str) -> str:
+    """Dropbox-relative path of the rendered output mp4 (safe to record in the
+    result — no absolute/local path)."""
+    return f"field-telop/outputs/{episode_id}/{job_id}.mp4"
+
+
+def output_local_path(dropbox_local_root: str | Path, episode_id: str, job_id: str) -> Path:
+    """Persistent local path (under the Dropbox mount) for the rendered output mp4."""
+    return Path(dropbox_local_root).expanduser() / output_rel_path(episode_id, job_id)
+
+
 def _load_approved(client: q.QueueClient, job_id: str) -> tuple[dict, dict]:
     """Read + structurally re-verify an approved-ready job and its approved manifest.
     Verification of HMAC/overlay_sha is delegated to render_passage_short at render
@@ -68,19 +80,24 @@ def _load_approved(client: q.QueueClient, job_id: str) -> tuple[dict, dict]:
 
 
 def default_render_fn(rp_job: dict, manifest: dict, registry_path: str | Path | None,
-                      *, render_script: Path | None = None) -> dict:
+                      *, output_path: str | Path, render_script: Path | None = None) -> dict:
     """Run render_passage_short.py as a subprocess (it does the authoritative
-    verify_approval + overlay_sha + approval gates). Returns {content_hash,
-    overlay_sha, output}. Only called in --execute."""
+    verify_approval + overlay_sha + approval gates) and render to a PERSISTENT
+    output_path (under the Dropbox mount). Returns {content_hash, overlay_sha,
+    output}. Only called in --execute."""
     script = render_script or (poller._SCRIPTS_DIR / "render_passage_short.py")
-    with tempfile.TemporaryDirectory() as td:
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as td:  # job/manifest are transient; the mp4 persists
         jp = Path(td) / "rp_job.json"
         mp = Path(td) / "manifest.json"
-        out = Path(td) / "out.mp4"
         jp.write_text(json.dumps(rp_job), encoding="utf-8")
         mp.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
-        cmd = poller.build_render_command(jp, mp, registry_path or "", render_script=script)
-        cmd += ["--output", str(out)]
+        # use the CURRENT interpreter so the render subprocess inherits delax_core +
+        # pillow (the runner is launched via `uv run --with <wheel> --with pillow`);
+        # literal "python3" would be the bare system python without delax_core.
+        cmd = poller.build_render_command(jp, mp, registry_path or "", render_script=script,
+                                          python_exe=sys.executable)
+        cmd += ["--output", str(output_path)]
         p = subprocess.run(cmd, capture_output=True, text=True)
         if p.returncode != 0:
             raise RunnerError(f"render_passage_short failed: {p.stderr.strip() or p.stdout.strip()}")
@@ -92,7 +109,7 @@ def default_render_fn(rp_job: dict, manifest: dict, registry_path: str | Path | 
         if "content_hash" not in fields or "overlay_sha" not in fields:
             raise RunnerError("render_passage_short produced no content_hash/overlay_sha")
         return {"content_hash": fields["content_hash"], "overlay_sha": fields["overlay_sha"],
-                "output": str(out)}
+                "output": str(output_path)}
 
 
 def default_proxy_fn(source: str | Path, dest: str | Path) -> None:
@@ -111,26 +128,30 @@ def process_one(client: q.QueueClient, job_id: str, *, registry_path: str | Path
     execute claims → renders → proxies → writes result → moves the job."""
     job, manifest = _load_approved(client, job_id)
     rp_job = poller.build_render_passage_job(job, job["overlay_sha"])
-    proxy_dst = proxy_local_path(dropbox_local_root, job["episode_id"])
+    ep = job["episode_id"]
+    proxy_dst = proxy_local_path(dropbox_local_root, ep)
+    output_rel = output_rel_path(ep, job_id)
+    output_dst = output_local_path(dropbox_local_root, ep, job_id)
 
     if not execute:
         # build commands only — no subprocess, no queue writes
         render_cmd = poller.build_render_command("<rp_job>", "<manifest>", registry_path or "<registry>")
-        return {"mode": "dry-run", "job_id": job_id, "episode_id": job["episode_id"],
+        return {"mode": "dry-run", "job_id": job_id, "episode_id": ep,
                 "render_cmd": render_cmd, "proxy_dest": str(proxy_dst),
-                "overlay_sha": job["overlay_sha"]}
+                "output_path": output_rel, "overlay_sha": job["overlay_sha"]}
 
     # claim: approved-ready → running
     client.write_json(q.job_path("running", job_id), {**job, "status": "running"},
                       f"chore(field-telop): claim {job_id}")
     client.delete(q.job_path("approved-ready", job_id), f"chore(field-telop): claim {job_id}")
     try:
-        source = resolve_source(job["episode_id"], path=registry_path)  # D6, fail-closed
-        rendered = render_fn(rp_job, manifest, registry_path)
+        source = resolve_source(ep, path=registry_path)  # D6, fail-closed
+        rendered = render_fn(rp_job, manifest, registry_path, output_path=output_dst)
         proxy_fn(source, proxy_dst)
         result = poller.build_result(job, rendered["overlay_sha"],
                                      output_content_hash=rendered["content_hash"],
                                      status="done", finished_at=now)
+        result["output_path"] = output_rel  # Dropbox-relative (no absolute path)
         terminal = "done"
     except Exception as e:  # noqa: BLE001 — any failure is recorded, never a stuck running job
         result = poller.build_result(job, job["overlay_sha"], output_content_hash="0" * 64,
