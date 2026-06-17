@@ -38,7 +38,8 @@ from field_shorts.sources import resolve_source
 # --- schema validation regexes (mirror field-telop-check-web; NOT overlay_sha) ---
 SHA_HEX = re.compile(r"^[0-9a-f]{64}$")
 GIT_SHA = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
-ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+# UTC only: "...Z" (Web toISOString) or "...+00:00" (delax_core approve_manifest).
+ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$")
 EPISODE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 CUE_ID = re.compile(r"^cue-\d{3,5}$")
 GH_LOGIN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
@@ -64,6 +65,12 @@ OVERLAY_KEYS = frozenset({
     "place", "info", "start_s", "end_s", "review_note", "approval_reset_required",
     "updated_by", "updated_at",
 })
+# An "approved-ready" job is produced by the local approve CLI (field_telop_approve):
+# the pending job advanced after HMAC re-approval, with the poller-computed
+# overlay_sha + the NEW approved content_hash + approver metadata. Only these are
+# render-eligible. (Pending jobs from the Web carry NO overlay_sha and are NOT
+# render-eligible — they await re-approval.)
+APPROVED_JOB_KEYS = JOB_KEYS | {"overlay_sha", "approved_by", "approved_at"}
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent  # .../scripts
 
@@ -125,6 +132,44 @@ def parse_job(data: object) -> dict:
     _require(_match(ISO_UTC, job.get("created_at")), "bad created_at")
     _require(job.get("status") in ("pending", "running", "done", "failed"), "bad status")
     return job
+
+
+def parse_approved_job(data: object) -> dict:
+    """Parse an APPROVED-READY job (from the local approve CLI after HMAC re-approval).
+    Unlike a pending job it DOES carry overlay_sha + approver metadata, status is
+    'approved-ready', and manifest_content_hash is the NEW approved hash. Only these
+    are render-eligible. Strict keys (APPROVED_JOB_KEYS) — fail-closed on anything else."""
+    _require(isinstance(data, dict), "approved job must be an object")
+    job = dict(data)  # type: ignore[arg-type]
+    _assert_exact_keys(job, APPROVED_JOB_KEYS, "approved job")
+    _require(job.get("status") == "approved-ready", "approved job status must be 'approved-ready'")
+    _require(_match(SHA_HEX, job.get("overlay_sha")), "bad overlay_sha")
+    _require(_match(GH_LOGIN, job.get("approved_by")), "bad approved_by")
+    _require(_match(ISO_UTC, job.get("approved_at")), "bad approved_at")
+    # reuse the pending-job field checks (minus the status enum / overlay_sha ban)
+    _require(job.get("schema_version") == 1, "job schema_version must be 1")
+    _require(job.get("job_kind") == JOB_KIND, f"job_kind must be {JOB_KIND}")
+    _require(_match(OVERLAY_ID, job.get("job_id")), "bad job_id")
+    _require(job.get("job_id") == job.get("overlay_id"), "job_id must equal overlay_id")
+    _require(_match(EPISODE_ID, job.get("episode_id")), "bad episode_id")
+    _require(_match(CUE_ID, job.get("cue_id")), "bad cue_id")
+    _require(isinstance(job.get("overlay_path"), str) and job["overlay_path"].startswith(OVERLAYS_DIR + "/"),
+             "bad overlay_path")
+    _require(_match(GIT_SHA, job.get("manifest_sha")), "bad manifest_sha")
+    _require(_match(SHA_HEX, job.get("manifest_content_hash")), "bad manifest_content_hash")
+    _require(_match(SHA_HEX, job.get("passage_info_hash")), "bad passage_info_hash")
+    _require(_match(SHA_HEX, job.get("design_sha")), "bad design_sha")
+    _require(job.get("preset") == PRESET, "bad preset")
+    _require(job.get("preset_version") == 1, "bad preset_version")
+    _require(_match(GH_LOGIN, job.get("requested_by")), "bad requested_by")
+    _require(_match(ISO_UTC, job.get("created_at")), "bad created_at")
+    return job
+
+
+def is_render_eligible(raw_job: dict) -> bool:
+    """Only 'approved-ready' jobs render. Pending jobs (no overlay_sha, await
+    re-approval) are NOT rendered by the poller."""
+    return isinstance(raw_job, dict) and raw_job.get("status") == "approved-ready"
 
 
 def parse_overlay(data: object) -> dict:
