@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 
 from field_shorts import field_telop_queue_poller as poller
+from field_shorts import field_telop_queue as q
 
 # Local absolute-path / leak markers that must never reach a GitHub-bound artifact.
 _LOCAL_PATH = re.compile(r"(^/)|(/Users/)|(/Volumes/)|(/private/)|(/var/folders/)|(/tmp/)")
@@ -144,6 +145,24 @@ def approve_overlay(job_in: dict, overlay_in: dict, base_manifest: dict, *,
     return approved, approved_job
 
 
+def push_approved(client, approved_manifest: dict, approved_job: dict) -> tuple[str, str]:
+    """Push the approved manifest + approved-ready job to the render-queue (Gap A):
+    the runner reads approved-ready from there. The approved manifest carries a
+    registry:// source (no absolute path) and an HMAC signature (an integrity tag —
+    it does NOT reveal the secret), so it is safe on GitHub. Re-checks fail-closed
+    before writing."""
+    _assert_registry_source(approved_manifest, "approved manifest (push)")
+    _assert_no_local_path(approved_manifest, "approved manifest (push)")
+    _assert_no_local_path(approved_job, "approved job (push)")
+    poller.parse_approved_job(approved_job)
+    ep = approved_job["episode_id"]
+    mpath = q.approved_manifest_path(ep, approved_job["manifest_content_hash"])
+    jpath = q.job_path("approved-ready", approved_job["job_id"])
+    client.write_json(mpath, approved_manifest, f"chore(field-telop): approved manifest {ep}")
+    client.write_json(jpath, approved_job, f"chore(field-telop): approved-ready {approved_job['job_id']}")
+    return mpath, jpath
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Field Telop local HMAC re-approval CLI")
     ap.add_argument("--job", required=True, type=Path, help="pending field-telop job JSON")
@@ -152,6 +171,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out-manifest", required=True, type=Path, help="approved manifest output")
     ap.add_argument("--out-job", required=True, type=Path, help="approved-ready job output")
     ap.add_argument("--approved-by", required=True, help="GitHub login of the human approver")
+    ap.add_argument("--push", action="store_true",
+                    help="also push approved manifest + approved-ready job to the render-queue branch")
+    ap.add_argument("--owner", default=os.environ.get("GITHUB_REPO_OWNER", "DELAxGithub"))
+    ap.add_argument("--repo", default=os.environ.get("GITHUB_REPO_NAME", "delax-field-archive"))
+    ap.add_argument("--branch", default="render-queue")
     args = ap.parse_args(argv)
 
     job_in = json.loads(args.job.read_text(encoding="utf-8"))
@@ -167,6 +191,10 @@ def main(argv: list[str] | None = None) -> int:
     args.out_job.write_text(json.dumps(approved_job, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[approve] approved {approved_job['job_id']} content_hash="
           f"{approved['approval']['content_hash'][:12]} overlay_sha={approved_job['overlay_sha'][:12]}")
+    if args.push:
+        client = q.GhQueueClient(args.owner, args.repo, args.branch)
+        mpath, jpath = push_approved(client, approved, approved_job)
+        print(f"[approve] pushed -> {mpath} , {jpath}")
     return 0
 
 

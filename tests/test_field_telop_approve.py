@@ -115,6 +115,53 @@ def test_pending_job_not_render_eligible():
     assert poller.is_render_eligible(_job()) is False
 
 
+def test_push_approved_writes_queue_paths():
+    from field_shorts import field_telop_queue as q
+    client = q.FakeQueueClient()
+    approved_manifest = {
+        "project": {"episode_id": "DBT_EP003"},
+        "approval": {"status": "approved", "content_hash": "b" * 64, "signature": "0" * 64},
+        "passage_info_hash": PIH, "design": {"design_sha": DESIGN_SHA},
+        "source": {"video": "registry://DBT_EP003", "duration_s": 600.0, "gps_csv": "registry://DBT_EP003"},
+        "cues": [{"id": "cue-001", "start_s": 12.0, "end_s": 22.0, "place": "x", "info": "y"}],
+    }
+    approved_job = A.build_approved_job(_job(), overlay_sha=H64, new_content_hash="b" * 64,
+                                        approved_by="h-kodera", approved_at="2026-06-18T00:00:00+00:00")
+    mpath, jpath = A.push_approved(client, approved_manifest, approved_job)
+    assert mpath == f"field-telop/manifests-approved/DBT_EP003/{'b' * 64}.json"
+    assert jpath == f"field-telop/jobs/approved-ready/{OID}.json"
+    assert client.read_json(mpath)["source"]["video"] == "registry://DBT_EP003"
+    assert client.read_json(jpath)["status"] == "approved-ready"
+
+
+def test_push_approved_rejects_absolute_source():
+    from field_shorts import field_telop_queue as q
+    client = q.FakeQueueClient()
+    bad_manifest = {"project": {"episode_id": "DBT_EP003"},
+                    "source": {"video": "/Volumes/x.mp4", "duration_s": 1.0, "gps_csv": "registry://DBT_EP003"}}
+    job = A.build_approved_job(_job(), overlay_sha=H64, new_content_hash="b" * 64,
+                               approved_by="h-kodera", approved_at="2026-06-18T00:00:00+00:00")
+    with pytest.raises(ApproveError):
+        A.push_approved(client, bad_manifest, job)
+    assert client.writes == []  # nothing written on reject
+
+
+def test_push_approved_rejects_gps_csv_and_missing_source():
+    from field_shorts import field_telop_queue as q
+    client = q.FakeQueueClient()
+    job = A.build_approved_job(_job(), overlay_sha=H64, new_content_hash="b" * 64,
+                               approved_by="h-kodera", approved_at="2026-06-18T00:00:00+00:00")
+    # registry video but absolute gps_csv → reject (allowlist covers all source fields)
+    m1 = {"project": {"episode_id": "DBT_EP003"},
+          "source": {"video": "registry://DBT_EP003", "duration_s": 1.0, "gps_csv": "/Volumes/cam/g.csv"}}
+    with pytest.raises(ApproveError):
+        A.push_approved(client, m1, job)
+    # source entirely missing → reject
+    with pytest.raises(ApproveError):
+        A.push_approved(client, {"project": {"episode_id": "DBT_EP003"}}, job)
+    assert client.writes == []
+
+
 # ── pure: no-local-path guard + secret fail-closed ─────────────────────────
 def test_assert_no_local_path():
     A._assert_no_local_path({"source": {"video": "registry://DBT_EP003"}}, "ok")  # passes
