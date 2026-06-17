@@ -104,13 +104,34 @@ launchctl bootout gui/$(id -u)/com.delax.field-telop-poller
 `proxy_dropbox_path` / `build_proxy_command`（`field_shorts.proxy.build_proxy_cmd` 再利用）/
 `build_result`（overlay_sha / output hash / status、source 非載せ）/ `assert_source_registered`（未登録 fail-closed）。
 
-**未実装（runner）**: polling loop / 実 GitHub branch I/O / 実 ffmpeg 実行 / 実 Dropbox upload /
-編集済み manifest の HMAC 再承認（real render の前提、下記）。
+**未実装（runner）**: polling loop / 実 GitHub branch I/O / 実 ffmpeg 実行 / 実 Dropbox upload。
 
-## 4. real render 前の未解決点（hard stop）
+## 4. HMAC 再承認フロー（Phase 6 で確定・解決済み）
 
-`render_passage_short` は `job.overlay_sha == overlay_sha(manifest_cue)`（**manifest 内の cue** に対して）
-かつ HMAC 承認済み `content_hash` 一致を要求する。web 編集は cue を変えるので、real render の前に
-**編集を反映した manifest を再承認（HMAC 再署名）** する必要がある。誰が・どう再承認するか（人間の
-再レビュー or 自動）は未確定。**poller は勝手に HMAC 再署名しない**（承認ゲートを弱めるため）。
-ここが決まり、source registry 登録 + delax_core wheel が揃うまで real render はしない。
+web 編集は cue を変えるので、`render_passage_short`（`job.overlay_sha == overlay_sha(manifest 内 cue)`
+＋ HMAC 承認 content_hash 一致を要求）に渡す前に **編集反映 manifest の再承認(HMAC 再署名)** が要る。
+これは **local approve CLI `scripts/field_shorts/field_telop_approve.py`** が担う（Web/Vercel/poller は
+署名しない）。
+
+```bash
+DELAX_HMAC_SECRET=... uv run --with <delax_core 0.3.4 wheel> --with pillow \
+  python scripts/field_shorts/field_telop_approve.py \
+    --job pending_job.json --overlay overlay.json --manifest base_manifest.json \
+    --out-manifest approved_manifest.json --out-job approved_job.json \
+    --approved-by <github-login>
+```
+
+処理: pending job/overlay/base manifest 整合確認 → overlay を cue に適用 → **source を
+`registry://<episode_id>` に sanitize**（絶対パスを GitHub-bound artifact に残さない。allowlist +
+denylist 二重 fail-closed）→ approval draft reset → `passage_v1.validate_passage_manifest` →
+`passage_v1.approve_passage_manifest`（HMAC 署名、**唯一の署名経路**）→ `verify_approval` →
+`render_passage_short.overlay_sha`(SSoT) で overlay_sha 算出 → job を **approved-ready** に更新
+（新 content_hash + overlay_sha + approver meta）。
+
+### state 遷移
+```
+pending (Web, overlay_sha なし)  ──approve CLI(人間+secret)──▶  approved-ready  ──poller──▶ running ─▶ done/failed
+```
+- poller は **`is_render_eligible`（status==approved-ready）のみ render**。pending は render しない。
+- `DELAX_HMAC_SECRET` 不在 → approve も verify も fail-closed。
+- **残る real-render 前提**（hard stop ではないが必要）: source registry 登録 + delax_core wheel + 実 manifest 配置。
