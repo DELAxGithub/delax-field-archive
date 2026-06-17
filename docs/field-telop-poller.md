@@ -1,12 +1,16 @@
 # Field Telop poller — setup & LaunchAgent template
 
 field-telop-check-web が render-queue ブランチに積む job/overlay を読み、Passage
-telop の実写レンダーを段取りする **field 専用 poller**（tachi poller に相乗りしない、
-別 LaunchAgent）。SSoT は `scripts/field_shorts/field_telop_queue_poller.py`。
+telop の実写レンダーを段取りする **field 専用 runner**（tachi poller に相乗りしない、
+別 LaunchAgent）。queue 検証 = `scripts/field_shorts/field_telop_queue_poller.py`、
+queue I/O = `field_telop_queue.py`、orchestration = `field_telop_runner.py`、
+再承認 = `field_telop_approve.py`。
 
-> ⚠️ **Phase 5 時点は dry-run（コマンド組立まで）**。実 GitHub render-queue I/O・実 ffmpeg・
-> 実 Dropbox upload・polling loop の常駐 entrypoint（`--loop`）は未実装。下記 LaunchAgent は
-> **scaffold（テンプレ）**で、runner 実装後に有効化する。**今は自動登録しない**。
+> ⚠️ **Phase 7 runner 実装済み**（`field_telop_runner.py`: `--dry-run` default /
+> `--execute` / `--once` / `--loop`）。**`--dry-run` は queue 書込も subprocess もしない**。
+> 実 GitHub write / 実 render は `--execute` 明示時のみ（delax_core wheel + DELAX_HMAC_SECRET +
+> ffmpeg + 実 source 登録が必要）。LaunchAgent 登録・常駐開始は**まだしない**（人間が手動で）。
+> 単一 Mac runner 前提（claim は running 書込→approved-ready 削除の順、厳密 lease 競合は未対応）。
 >
 > ⚠️ **production 化前に** `feat/field-passage-integration`（render_passage_short.py /
 > field_shorts/* / passage_v1 の在処）を delax-field-archive main か基準ブランチへ統合すること。
@@ -57,7 +61,7 @@ telop の実写レンダーを段取りする **field 専用 poller**（tachi po
     <string>/bin/zsh</string>
     <string>-lc</string>
     <!-- runner entrypoint (--loop) is NOT yet implemented; placeholder command -->
-    <string>uv run --with /ABS/PATH/delax_video_core-0.3.4-py3-none-any.whl --with pillow python -m field_shorts.field_telop_queue_poller --loop</string>
+    <string>uv run --with /ABS/PATH/delax_video_core-0.3.4-py3-none-any.whl --with pillow python -m field_shorts.field_telop_runner --execute --loop</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -104,7 +108,25 @@ launchctl bootout gui/$(id -u)/com.delax.field-telop-poller
 `proxy_dropbox_path` / `build_proxy_command`（`field_shorts.proxy.build_proxy_cmd` 再利用）/
 `build_result`（overlay_sha / output hash / status、source 非載せ）/ `assert_source_registered`（未登録 fail-closed）。
 
-**未実装（runner）**: polling loop / 実 GitHub branch I/O / 実 ffmpeg 実行 / 実 Dropbox upload。
+## 3a. runner（Phase 7、実装済み）
+
+```bash
+# dry-run（default・安全。queue 書込も subprocess もしない。1 pass）
+uv run --with <wheel> --with pillow python -m field_shorts.field_telop_runner --once
+
+# 実 render（要 DELAX_HMAC_SECRET + 実 source 登録 + ffmpeg）
+DELAX_HMAC_SECRET=... uv run --with <wheel> --with pillow \
+  python -m field_shorts.field_telop_runner --execute --once   # or --loop
+```
+- approved-ready job のみ処理（`is_render_eligible`）。pending は無視。
+- approved manifest を `manifests-approved/<ep>/<content_hash>` から取得 → `assert_manifest_match`。
+- `render_passage_short.py`(subprocess) が overlay_sha/HMAC を最終検証（runner は委譲・再署名しない）。
+- proxy は local Dropbox mount へ ffmpeg 出力（自動同期）。result を `field-telop/results/<job_id>.json` へ。
+- 失敗時 failed 遷移（stuck running なし）、error は絶対パス redact（source 非露出）。
+
+## 3b. approve → render-queue（Gap A）
+`field_telop_approve.py --push` で approved manifest + approved-ready job を render-queue へ。
+source は registry:// allowlist + denylist で fail-closed。
 
 ## 4. HMAC 再承認フロー（Phase 6 で確定・解決済み）
 
