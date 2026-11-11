@@ -98,7 +98,7 @@ YouTube Shorts / Instagram Reels / TikTok 全てに同じ動画を出す前提:
 - 中央寄せ字幕の最大幅: **752px**
 
 これらは TikTok の右側 164px (action button stack) と下部 370px (広告 caption)
-を前提とした最厳値。動かす前に必ず spec doc を読むこと。
+を前提とした最厳値。動かす前に `docs/short-render-spec.md` を読む。
 
 ### 流用元
 
