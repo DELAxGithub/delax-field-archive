@@ -82,7 +82,7 @@ DELAX Field Archive：マラガ拠点の映像作家デラ（Hiroshi Kodera / �
 ## 禁則
 
 - 素材ファイルをcommitしそうになったら警告する
-- エピソードIDの重複を検知したら必ず指摘する
+- エピソードIDの重複・ディレクトリ名との不一致は `scripts/check_episode_ids.py` が検査する（`episodes/` を触る commit を `.githooks/pre-commit` が止める。clone 後は `git config core.hooksPath .githooks` を一度実行）
 - 過度に汎用化されたフレームワーク提案はしない（YAGNI優先）
 
 ## 9:16 ショート レンダリング (2026-04-26 注入)

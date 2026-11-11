@@ -1,0 +1,4 @@
+#!/bin/sh
+# episodes/ を触る commit では episode.yaml の id 重複・ディレクトリ名との不一致を止める。
+git diff --cached --name-only | grep -q '^episodes/' || exit 0
+exec python3 scripts/check_episode_ids.py
