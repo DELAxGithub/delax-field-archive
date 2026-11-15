@@ -66,7 +66,7 @@ delax-field-archive/
 詳細は `docs/workflow.md` 参照。
 
 GPS付き走行動画の「Video Passage」レビュー・縦横書き出し・限定公開は
-`docs/video-passage-pipeline.md` を参照。`review.json` を共通契約にしているため、
+`~/work/ambient/bike-tour/local/docs/video-passage-pipeline.md`（自転車ルートとして2026-11-16に移設） を参照。`review.json` を共通契約にしているため、
 Codex / Claude Code / Antigravity など特定のAIツールに依存しない。
 
 ## 運用ルール

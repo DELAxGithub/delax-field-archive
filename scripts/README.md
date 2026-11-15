@@ -16,13 +16,13 @@ GPS Bluetooth Remote Controller 付き素材は、軽量な LRF 内の `djmd`
 メタデータから抽出できる。
 
 ```bash
-scripts/dji_gps_pipeline.py extract \
+~/work/ambient/bike-tour/local/scripts/dji_gps_pipeline.py extract \
   --source <clip.LRF> --csv gps.csv --gpx route.gpx
 
-scripts/dji_gps_pipeline.py geocode \
+~/work/ambient/bike-tour/local/scripts/dji_gps_pipeline.py geocode \
   --csv gps.csv --srt gps-telop.srt --cache geocache.json
 
-scripts/dji_gps_pipeline.py render \
+~/work/ambient/bike-tour/local/scripts/dji_gps_pipeline.py render \
   --source <clip.MP4> --srt gps-telop.srt \
   --output gps-preview.mp4 --duration 90
 ```
@@ -35,13 +35,13 @@ FFmpeg が libass/subtitles filter なしでビルドされていても動作す
 GPS解析後の街情報を、縦横HTMLでレビューしてから同じデータで書き出す。
 AIツールには依存せず、`review.json` を共通の原本として扱う。
 
-詳細: [`docs/video-passage-pipeline.md`](../docs/video-passage-pipeline.md)
+詳細: [`~/work/ambient/bike-tour/local/docs/video-passage-pipeline.md`（自転車ルートとして2026-11-16に移設）](../../../../work/ambient/bike-tour/local/docs/video-passage-pipeline.md)
 
 ```bash
-scripts/video_passage_pipeline.py init ...
-scripts/video_passage_pipeline.py review --manifest <review.json>
-scripts/video_passage_pipeline.py approve --manifest <review.json> --by delax
-scripts/video_passage_pipeline.py render --manifest <review.json> --format both
-scripts/video_passage_pipeline.py upload-unlisted \
+~/work/ambient/bike-tour/local/scripts/video_passage_pipeline.py init ...
+~/work/ambient/bike-tour/local/scripts/video_passage_pipeline.py review --manifest <review.json>
+~/work/ambient/bike-tour/local/scripts/video_passage_pipeline.py approve --manifest <review.json> --by delax
+~/work/ambient/bike-tour/local/scripts/video_passage_pipeline.py render --manifest <review.json> --format both
+~/work/ambient/bike-tour/local/scripts/video_passage_pipeline.py upload-unlisted \
   --manifest <review.json> --description <description.txt>
 ```
